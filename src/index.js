@@ -1,60 +1,90 @@
 import "babel-polyfill";
 import Chart from "chart.js";
 
-const currencyURL = "www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
-// const meteoURL = "/xml.meteoservice.ru/export/gismeteo/point/140.xml";
+const meteoURL = "/xml.meteoservice.ru/export/gismeteo/point/140.xml";
+let resultTimes = [];
+let maxTemp = [];
+let minTemp = [];
 
 async function loadCurrency() {
-  const response = await fetch(currencyURL);
+  const response = await fetch(meteoURL);
   const xmlTest = await response.text();
+  // await приостанавливает выполнение функции 
   const parser = new DOMParser();
   const currencyData = parser.parseFromString(xmlTest, "text/xml");
-  // <Cube currency="USD" rate="1.1321" />
-  const rates = currencyData.querySelectorAll("Cube[currency][rate]");
-  const result = Object.create(null);
-  for (let i = 0; i < rates.length; i++) {
-    const rateTag = rates.item(i);
-    const rate = rateTag.getAttribute("rate");
-    const currency = rateTag.getAttribute("currency");
-    result[currency] = rate;
-  }
-  result["EUR"] = 1;
-  // result["RANDOM"] = 1 + Math.random();
-  return result;
-}
+  // <TEMPERATURE max="-0" min="-6"/>
+  // <FORECAST day="17" month="04" year="2019" hour="21">
+  const temp = currencyData.querySelectorAll("TEMPERATURE[max][min]");
+  const hour = currencyData.querySelectorAll("FORECAST[hour]");
 
-function normalizeDataByCurrency(data, currency) {
-  const result = Object.create(null);
-  const value = data[currency];
-  for (const key of Object.keys(data)) {
-    result[key] = value / data[key];
-  }
-  return result;
+    for (let i = 0; i < hour.length; i++) {
+      const rateTag = hour.item(i);
+      const currency = rateTag.getAttribute("hour");
+      resultTimes[i] = currency;
+    }
+
+    for (let i = 0; i < temp.length; i++) {
+      const rateTag = temp.item(i);
+      const currency = rateTag.getAttribute("max");
+      maxTemp[i] = currency;
+    }
+
+    for (let i = 0; i < temp.length; i++) {
+      const rateTag = temp.item(i);
+      const currency = rateTag.getAttribute("min");
+      minTemp[i] = currency;
+    }
 }
 
 const buttonBuild = document.getElementById("btn");
 const canvasCtx = document.getElementById("out").getContext("2d");
+
 buttonBuild.addEventListener("click", async function() {
   const currencyData = await loadCurrency();
-  const normalData = normalizeDataByCurrency(currencyData, "RUB");
-  const keys = Object.keys(normalData).sort((k1, k2) =>
-    compare(normalData[k1], normalData[k2])
-  );
-  const plotData = keys.map(key => normalData[key]);
 
+  // параметры графика
   const chartConfig = {
     type: "line",
 
     data: {
-      labels: keys,
+      labels: resultTimes,
       datasets: [
         {
-          label: "Стоимость валюты в рублях",
-          backgroundColor: "rgb(255, 20, 20)",
-          borderColor: "rgb(180, 0, 0)",
-          data: plotData
+          label: "Температура",
+          backgroundColor: "rgba(255, 20, 20, 0.7)",
+          borderColor: "rgba(255, 20, 20, 0.9)",
+          data: maxTemp
+        },
+        {
+          label: "Температура по ощущениям",
+          backgroundColor: "rgba(66, 12, 153, 0.7)",
+          borderColor: "rgb(66, 12, 153, 0.9)",
+          data: minTemp
         }
       ]
+    },
+    options: {
+      responsive: true,
+      title:{
+        display:true,
+        text:'Город Уфа'
+      },
+      scales: {
+        xAxes: [{
+          display: true,
+          scaleLabel: {
+            display: true,
+            labelString: 'Часы'
+          }
+        }],
+        yAxes: [{
+          display: true,
+          scaleLabel: {
+            display: true,
+            labelString: 'Температура'
+          },
+        }]
+      }
     }
   };
 
